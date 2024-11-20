@@ -17,10 +17,10 @@ func NewParcelStore(db *sql.DB) ParcelStore {
 	return ParcelStore{db: db}
 }
 
-func (s ParcelStore) readData(dataScanner DBScanner) Parcel {
+func (s ParcelStore) readData(dataScanner DBScanner) (Parcel, error) {
 	var parcel = Parcel{}
 
-	dataScanner.Scan(
+	var err = dataScanner.Scan(
 		&parcel.Number,
 		&parcel.Client,
 		&parcel.Status,
@@ -28,108 +28,100 @@ func (s ParcelStore) readData(dataScanner DBScanner) Parcel {
 		&parcel.CreatedAt,
 	)
 
-	return parcel
+	return parcel, err
 }
 
 func (s ParcelStore) Add(p Parcel) (int, error) {
-	var result, insertError = s.db.Exec(
+	var result, err = s.db.Exec(
 		"INSERT INTO parcel (client, status, address, created_at) VALUES (?, ?, ?, ?)",
 		p.Client, p.Status, p.Address, p.CreatedAt,
 	)
 
-	if insertError != nil {
-		return 0, insertError
+	if err != nil {
+		return 0, err
 	}
 
-	var parcelID, idError = result.LastInsertId()
+	parcelID, err := result.LastInsertId()
 
-	if idError != nil {
-		return 0, idError
-	}
-
-	return int(parcelID), nil
+	return int(parcelID), err
 }
 
 func (s ParcelStore) Get(number int) (Parcel, error) {
+	var err error
+
 	var parcelData = s.db.QueryRow("SELECT * FROM parcel WHERE number = ?", number)
 
-	var selectError = parcelData.Err()
+	err = parcelData.Err()
 
-	if selectError != nil {
-		return Parcel{}, selectError
+	if err != nil {
+		return Parcel{}, err
 	}
 
-	parcel := Parcel{}
+	var parcel = Parcel{}
 
-	parcel = s.readData(parcelData)
+	parcel, err = s.readData(parcelData)
 
-	return parcel, nil
+	return parcel, err
 }
 
 func (s ParcelStore) GetByClient(client int) ([]Parcel, error) {
-	var parcelsData, selectError = s.db.Query("SELECT * FROM parcel WHERE client = ?", client)
+	var parcelsData, err = s.db.Query("SELECT * FROM parcel WHERE client = ?", client)
 
 	defer parcelsData.Close()
 
-	if selectError != nil {
-		return nil, selectError
+	if err != nil {
+		return nil, err
 	}
 
 	var clientParcels []Parcel
 
 	for parcelsData.Next() {
-		clientParcels = append(clientParcels, s.readData(parcelsData))
+		parcel, err := s.readData(parcelsData)
+
+		if err != nil {
+			return clientParcels, err
+		}
+
+		clientParcels = append(clientParcels, parcel)
 	}
 
-	return clientParcels, nil
+	return clientParcels, parcelsData.Err()
 }
 
 func (s ParcelStore) SetStatus(number int, status string) error {
-	var _, updateError = s.db.Exec("UPDATE parcel SET status = ? WHERE number = ?", status, number)
+	var _, err = s.db.Exec("UPDATE parcel SET status = ? WHERE number = ?", status, number)
 
-	if updateError != nil {
-		return updateError
-	}
-
-	return nil
+	return err
 }
 
 func (s ParcelStore) SetAddress(number int, address string) error {
-	var parcel, selectError = s.Get(number)
+	var parcel, err = s.Get(number)
 
-	if selectError != nil {
-		return selectError
+	if err != nil {
+		return err
 	}
 
 	if parcel.Status != ParcelStatusRegistered {
 		return errors.New("you can change the address only if the status value is registered")
 	}
 
-	var _, updateError = s.db.Exec("UPDATE parcel SET address = ? WHERE number = ?", address, number)
+	_, err = s.db.Exec("UPDATE parcel SET address = ? WHERE number = ?", address, number)
 
-	if updateError != nil {
-		return updateError
-	}
-
-	return nil
+	return err
 }
 
 func (s ParcelStore) Delete(number int) error {
-	var parcel, selectError = s.Get(number)
+	var parcel, err = s.Get(number)
 
-	if selectError != nil {
-		return selectError
+	if err != nil {
+		return err
 	}
 
 	if parcel.Status != ParcelStatusRegistered {
 		return errors.New("you can delete a row only if the status value is registered")
 	}
 
-	var _, deleteError = s.db.Exec("DELETE FROM parcel WHERE number = ?", number)
+	_, err = s.db.Exec("DELETE FROM parcel WHERE number = ?", number)
 
-	if deleteError != nil {
-		return deleteError
-	}
-
-	return nil
+	return err
 }
