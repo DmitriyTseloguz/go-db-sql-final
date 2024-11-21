@@ -97,15 +97,23 @@ func (s ParcelService) Delete(number int) error {
 }
 
 func main() {
-	// настройте подключение к БД
+	db, err := sql.Open("sqlite", "tracker.db")
 
-	store := // создайте объект ParcelStore функцией NewParcelStore
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	defer db.Close()
+
+	store := NewParcelStore(db)
 	service := NewParcelService(store)
 
 	// регистрация посылки
 	client := 1
 	address := "Псков, д. Пушкина, ул. Колотушкина, д. 5"
-	p, err := service.Register(client, address)
+	parcel, err := service.Register(client, address)
+
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -113,14 +121,15 @@ func main() {
 
 	// изменение адреса
 	newAddress := "Саратов, д. Верхние Зори, ул. Козлова, д. 25"
-	err = service.ChangeAddress(p.Number, newAddress)
+	err = service.ChangeAddress(parcel.Number, newAddress)
+
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	// изменение статуса
-	err = service.NextStatus(p.Number)
+	err = service.NextStatus(parcel.Number)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -134,7 +143,7 @@ func main() {
 	}
 
 	// попытка удаления отправленной посылки
-	err = service.Delete(p.Number)
+	err = service.Delete(parcel.Number)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -149,14 +158,14 @@ func main() {
 	}
 
 	// регистрация новой посылки
-	p, err = service.Register(client, address)
+	parcel, err = service.Register(client, address)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	// удаление новой посылки
-	err = service.Delete(p.Number)
+	err = service.Delete(parcel.Number)
 	if err != nil {
 		fmt.Println(err)
 		return
