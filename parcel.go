@@ -43,6 +43,10 @@ func (s ParcelStore) Add(p Parcel) (int, error) {
 
 	parcelID, err := result.LastInsertId()
 
+	if err != nil {
+		return 0, err
+	}
+
 	return int(parcelID), err
 }
 
@@ -60,6 +64,10 @@ func (s ParcelStore) Get(number int) (Parcel, error) {
 	var parcel = Parcel{}
 
 	parcel, err = s.readData(parcelData)
+
+	if err != nil {
+		return Parcel{}, err
+	}
 
 	return parcel, err
 }
@@ -85,7 +93,13 @@ func (s ParcelStore) GetByClient(client int) ([]Parcel, error) {
 		clientParcels = append(clientParcels, parcel)
 	}
 
-	return clientParcels, parcelsData.Err()
+	err = parcelsData.Err()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return clientParcels, nil
 }
 
 func (s ParcelStore) SetStatus(number int, status string) error {
